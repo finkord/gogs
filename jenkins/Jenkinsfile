@@ -71,7 +71,7 @@ pipeline {
 
         stage('Test Postgres Database') {
             steps {
-                sh'sudo apt-get install -y postgresql-10'
+                sh'sudo apt-get install -y postgresql'
                 sh'go test -shuffle=on -v -race -coverprofile=coverage -covermode=atomic ./internal/database/...' 
             }
         }
