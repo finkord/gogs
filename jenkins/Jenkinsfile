@@ -3,13 +3,6 @@ pipeline {
 
     environment {
         GO_VERSION = '1.24.0'
-
-        GOGS_DATABASE_TYPE = 'postgres'
-        PGHOST = 'localhost'
-        PGPORT = '5432'
-        PGUSER = 'postgres'
-        PGPASSWORD = 'postgres'
-        PGSSLMODE = 'disable'
     }
     
     tools {
@@ -70,6 +63,13 @@ pipeline {
         }
 
         stage('Setup PostgreSQL') {
+            environment {
+                PGHOST = 'localhost'
+                PGPORT = '5432'
+                PGUSER = 'postgres'
+                PGPASSWORD = 'postgres'
+                PGSSLMODE = 'disable'
+            }
             steps {
                 sh '''
                     # Install PostgreSQL
