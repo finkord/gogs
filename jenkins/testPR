@@ -1,0 +1,97 @@
+pipeline {
+    agent any
+
+    environment {
+        GITHUB_CREDENTIALS_ID = credentials('f109eef9-e07b-413c-b686-ea287ecc170d')
+        GO_VERSION = '1.24.0'
+    }
+    
+    tools {
+         // Depend on Go plugin
+        go "${GO_VERSION}" 
+    }
+
+    triggers {
+        pollSCM('H/1 * * * *')
+    }
+    
+    options {
+        buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '5', daysToKeepStr: '', numToKeepStr: '5')
+    }
+
+    stages {
+        
+        stage('Validate & Generate Code') {
+            steps {
+
+                sh'go version'
+                script {
+                    githubNotify status: 'PENDING', 
+                                description: 'Build succeeded',  
+                                context: 'ci/jenkins/build-status',
+                                credentialsId: env.GITHUB_CREDENTIALS_ID
+                }
+                
+            }
+            
+        }
+
+        stage('Lint') {
+            steps {
+
+            }
+        }
+        
+        stage('Test') {
+            steps {
+
+            }
+        }
+
+
+        stage('Test Postgres Database') {
+            environment {
+
+            }
+            steps {
+
+            }
+        }
+        
+        stage('Build') {
+            steps {
+
+            }
+        }
+        
+        stage('Archive Build') {
+            steps {
+
+            }
+        }
+    }
+
+    //test test
+
+    post {
+        always {
+            // cleanWs()
+        }
+        success {
+            script {
+                githubNotify status: 'SUCCESS', 
+                            description: 'Build succeeded',  
+                            context: 'ci/jenkins/build-status',
+                            credentialsId: env.GITHUB_CREDENTIALS_ID
+            }
+        }
+        failure {
+            script {
+                githubNotify status: 'FAILURE',  
+                            description: 'Build failed', 
+                            context: 'ci/jenkins/build-status',
+                            credentialsId: env.GITHUB_CREDENTIALS_ID
+            }
+        }
+    }
+}
