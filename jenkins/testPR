@@ -22,7 +22,6 @@ pipeline {
         
         stage('Validate & Generate Code') {
             steps {
-
                 sh'go version'
                 script {
                     githubNotify status: 'PENDING', 
@@ -33,40 +32,6 @@ pipeline {
                 
             }
             
-        }
-
-        stage('Lint') {
-            steps {
-
-            }
-        }
-        
-        stage('Test') {
-            steps {
-
-            }
-        }
-
-
-        stage('Test Postgres Database') {
-            environment {
-
-            }
-            steps {
-
-            }
-        }
-        
-        stage('Build') {
-            steps {
-
-            }
-        }
-        
-        stage('Archive Build') {
-            steps {
-
-            }
         }
     }
 
