@@ -10,15 +10,32 @@ pipeline {
     }
 
     triggers {
-        pollSCM('H/1 * * * *')
+        pollSCM('H/2 * * * *')
     }
     
     options {
         buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '5', daysToKeepStr: '', numToKeepStr: '5')
     }
 
+    stage('Checkout') {
+      steps {
+        checkout([$class: 'GitSCM',
+          branches: [[name: 'origin/pr/*']],
+          userRemoteConfigs: [[
+            url: 'https://github.com/finkord/gogs.git',
+            credentialsId: '065cfae6-8085-4328-8d29-57b38cbacdf1'
+          ]],
+          extensions: [
+            [$class: 'CloneOption', noTags: true, shallow: true]
+          ],
+          refspec: '+refs/pull/*/head:refs/remotes/origin/pr/*'
+        ])
+
+        echo "PR branch ${env.GIT_BRANCH}"
+      }
+    }
+
     stages {
-        
         stage('Validate & Generate Code') {
             steps {
                 sh'go version'
