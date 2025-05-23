@@ -36,9 +36,9 @@ pipeline {
     }
 
     post {
-        always {
-            // cleanWs()
-        }
+        // always {
+        //     // cleanWs()
+        // }
         success {
             script {
                 githubNotify status: 'SUCCESS', 
