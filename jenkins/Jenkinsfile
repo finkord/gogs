@@ -1,11 +1,19 @@
 pipeline {
     agent any
-    
+
     environment {
         GO_VERSION = '1.24.0'
+
+        GOGS_DATABASE_TYPE = 'postgres'
+        PGHOST = 'localhost'
+        PGPORT = '5432'
+        PGUSER = 'postgres'
+        PGPASSWORD = 'postgres'
+        PGSSLMODE = 'disable'
     }
     
     tools {
+         // Depend on Go plugin
         go "${GO_VERSION}" 
     }
 
@@ -18,13 +26,6 @@ pipeline {
     }
 
     stages {
-        // stage('Checkout') {
-        //     steps {
-        //         git credentialsId: 'f109eef9-e07b-413c-b686-ea287ecc170d',
-        //             url: 'https://github.com/finkord/gogs',
-        //             branch: 'main'
-        //     }
-        // }
         
         stage('Validate & Generate Code') {
             steps {
@@ -64,8 +65,14 @@ pipeline {
                             junit 'report.xml'
                         }
                     }
-
                 }
+            }
+        }
+
+        stage('Test Postgres Database') {
+            steps {
+                sh'sudo apt-get install -y postgresql-10'
+                sh'go test -shuffle=on -v -race -coverprofile=coverage -covermode=atomic ./internal/database/...' 
             }
         }
         
@@ -89,7 +96,7 @@ pipeline {
                     go tool cover -html=coverage.out -o coverage.html
                     cp ./coverage*.out ${buildArtifactsDir}/coverages/
                     """
-                    publishHTML([reportDir: '.', reportFiles: 'coverage.html', reportName: 'Go Coverage'])
+                    //publishHTML([reportDir: '.', reportFiles: 'coverage.html', reportName: 'Go Coverage'])
                     archiveArtifacts artifacts: "${buildArtifactsDir}/**", fingerprint: true
                 }
             }
