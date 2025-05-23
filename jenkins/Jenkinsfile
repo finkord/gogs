@@ -69,9 +69,57 @@ pipeline {
             }
         }
 
+        stage('Setup PostgreSQL') {
+            steps {
+                sh '''
+                    # Install PostgreSQL
+                    sudo apt-get update
+                    sudo apt-get install -y postgresql
+                    
+                    # Start PostgreSQL service
+                    sudo systemctl start postgresql
+                    sudo systemctl enable postgresql
+                    
+                    # Wait for PostgreSQL to start
+                    sleep 5
+                    
+                    # Set up PostgreSQL for testing
+                    sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+                    sudo -u postgres createdb gogs_test
+                    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE gogs_test TO postgres;"
+                    
+                    # Configure authentication - allow md5 authentication for localhost
+                    sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = 'localhost'/" /etc/postgresql/*/main/postgresql.conf
+                    
+                    # Update pg_hba.conf to allow password authentication
+                    sudo sed -i 's/local   all             all                                     peer/local   all             all                                     md5/' /etc/postgresql/*/main/pg_hba.conf
+                    sudo sed -i 's/host    all             all             127.0.0.1\\/32            scram-sha-256/host    all             all             127.0.0.1\\/32            md5/' /etc/postgresql/*/main/pg_hba.conf
+                    
+                    # Restart PostgreSQL to apply configuration changes
+                    sudo systemctl restart postgresql
+                    
+                    # Wait for PostgreSQL to be ready
+                    timeout=30
+                    while ! pg_isready -h localhost -U postgres -d gogs_test > /dev/null 2>&1; do
+                        echo "Waiting for PostgreSQL to be ready..."
+                        sleep 2
+                        timeout=$((timeout - 1))
+                        if [ $timeout -eq 0 ]; then
+                            echo "PostgreSQL failed to start within expected time"
+                            exit 1
+                        fi
+                    done
+                    
+                    echo "PostgreSQL is ready!"
+                    
+                    # Test connection
+                    PGPASSWORD=postgres psql -h localhost -U postgres -d gogs_test -c "SELECT version();"
+                '''
+            }
+        }
+
         stage('Test Postgres Database') {
             steps {
-                sh'sudo apt-get install -y postgresql'
                 sh'go test -shuffle=on -v -race -coverprofile=coverage -covermode=atomic ./internal/database/...' 
             }
         }
