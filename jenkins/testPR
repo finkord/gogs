@@ -35,12 +35,10 @@ pipeline {
         }
     }
 
-    //test test
-
     post {
-        always {
-            // cleanWs()
-        }
+        // always {
+        //     // cleanWs()
+        // }
         success {
             script {
                 githubNotify status: 'SUCCESS', 
