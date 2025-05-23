@@ -7,7 +7,6 @@ pipeline {
     }
     
     tools {
-         // Depend on Go plugin
         go "${GO_VERSION}" 
     }
 
