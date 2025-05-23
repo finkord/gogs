@@ -181,7 +181,7 @@ pipeline {
                 def targetUrl = env.BUILD_URL
                 def sha = env.GIT_COMMIT     
                 def githubToken = credentials('065cfae6-8085-4328-8d29-57b38cbacdf1')   
-                
+
                 sh """
                     curl -L \
                         -X POST \
