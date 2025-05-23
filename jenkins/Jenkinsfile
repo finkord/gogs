@@ -164,8 +164,6 @@ pipeline {
         // }
     }
 
-    //test test
-
     post {
         // always {
         //     // cleanWs()
