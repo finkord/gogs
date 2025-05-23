@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        GITHUB_CREDENTIALS_ID = credentials('f109eef9-e07b-413c-b686-ea287ecc170d')
         GO_VERSION = '1.24.0'
     }
     
@@ -23,13 +22,12 @@ pipeline {
         stage('Validate & Generate Code') {
             steps {
                 sh'go version'
-                script {
-                    githubNotify status: 'PENDING', 
-                                description: 'Build succeeded',  
-                                context: 'ci/jenkins/build-status',
-                                credentialsId: env.GITHUB_CREDENTIALS_ID
-                }
-                
+                // script {
+                //     githubNotify status: 'PENDING', 
+                //                 description: 'Build succeeded',  
+                //                 context: 'ci/jenkins/build-status',
+                //                 credentialsId: env.GITHUB_CREDENTIALS_ID
+                // }
             }
             
         }
@@ -42,20 +40,10 @@ pipeline {
         //     // cleanWs()
         // }
         success {
-            script {
-                githubNotify status: 'SUCCESS', 
-                            description: 'Build succeeded',  
-                            context: 'ci/jenkins/build-status',
-                            credentialsId: env.GITHUB_CREDENTIALS_ID
-            }
+            echo 'Gogs build succeeded!'
         }
         failure {
-            script {
-                githubNotify status: 'FAILURE',  
-                            description: 'Build failed', 
-                            context: 'ci/jenkins/build-status',
-                            credentialsId: env.GITHUB_CREDENTIALS_ID
-            }
+            echo 'Gogs build succeeded!'
         }
     }
 }
