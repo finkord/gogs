@@ -71,8 +71,11 @@ envsubst_vars() {
     GOGS_SSH_PORT=${GOGS_SSH_PORT:-"22"} \
     GOGS_START_SSH_SERVER=${GOGS_START_SSH_SERVER:-"false"} \
     GOGS_OFFLINE_MODE=${GOGS_OFFLINE_MODE:-"false"} \
+    GOGS_LOG_MODE=${GOGS_LOG_MODE:-"file"} \
     envsubst < /app/gogs/docker/templates/app.ini > /data/gogs/conf/app.ini
 }
+
+OTEL_HOST_NAME=${OTEL_HOST_NAME:-"gogs"}
 
 setids
 cleanup
