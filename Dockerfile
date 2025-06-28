@@ -20,18 +20,19 @@ COPY . .
 
 # Install Task
 RUN ./docker/build/install-task.sh
+
 # Build Gogs
 RUN TAGS="cert pam" task build
+
+# Install OCB builder
+RUN go install go.opentelemetry.io/collector/cmd/builder@v0.128.0
+
+# Build OpenTelemetry Collector binary
+RUN builder --config=./docker/templates/builder-config.yaml
 
 # Build OpenTelemetry Go Instrumentation
 RUN git clone https://github.com/open-telemetry/opentelemetry-go-instrumentation.git /otel && \
   cd /otel && make build
-
-# Download OpenTelemetry Collector
-RUN curl -fsSL -o /otelcol.tar.gz https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.128.0/otelcol-contrib_0.128.0_linux_amd64.tar.gz && \
-  mkdir -p /otelcol && \
-  tar -xzf /otelcol.tar.gz -C /otelcol && \
-  rm /otelcol.tar.gz
 
 # Stage 2: Final runtime image
 FROM alpine:3.21
@@ -64,8 +65,8 @@ WORKDIR /app/gogs
 # Copy runtime files
 COPY docker ./docker
 COPY --from=binarybuilder /gogs.io/gogs/gogs .
+COPY --from=binarybuilder /gogs.io/gogs/otelcol-gogs/otelcol-gogs /app/gogs/otelcol
 COPY --from=binarybuilder /otel/otel-go-instrumentation /app/otel-go-instrumentation
-COPY --from=binarybuilder /otelcol /app/otelcol
 
 RUN ./docker/build/finalize.sh
 

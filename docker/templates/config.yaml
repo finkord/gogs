@@ -26,14 +26,11 @@ receivers:
 
 processors:
   batch:
-  resourcedetection/docker:
-    detectors: [env, docker]
-    timeout: 2s
-    override: false
-  resourcedetection/system:
-    detectors: ["system"]
-    system:
-      hostname_sources: ["dns", "os"] 
+  resource/addhost:
+    attributes:
+      - key: host.name
+        value: ${OTEL_HOST_NAME}
+        action: upsert
 
 exporters:
   splunk_hec/traces:
@@ -56,11 +53,11 @@ service:
   pipelines:
     traces:
       receivers: [otlp/traces]
-      processors: [batch, resourcedetection/docker]
+      processors: [batch, resource/addhost]
       exporters: [splunk_hec/traces]
 
     logs:
       receivers: [filelog]
-      processors: [batch, resourcedetection/docker]
+      processors: [batch, resource/addhost]
       exporters: [splunk_hec/logs]
 
