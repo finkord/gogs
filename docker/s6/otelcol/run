@@ -1,3 +1,0 @@
-#!/bin/sh
-
-exec gosu git /app/gogs/otelcol --config /app/gogs/docker/templates/config.yaml
