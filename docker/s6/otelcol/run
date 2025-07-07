@@ -1,3 +1,0 @@
-#!/bin/sh
-
-exec /app/otelcol/otelcol-contrib --config /app/gogs/docker/templates/config.yaml

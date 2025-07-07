@@ -2,15 +2,15 @@ pipeline {
     agent any
 
     environment {
-        GO_VERSION = '1.24.0'
-
-        IMAGE_NAME  = 'gogs'
-        ECR_NAMESPACE = 'gogs'
-        ECR_REPO_NAME = 'images'
-        ECR_URI    = "${env.ECR_URI}"
-        ECR_REGION  = "${env.ECR_REGION}"
-        CREDENTIALS_ID = 'Jenkins_ECR'
-
+        // Golang
+        GO_VERSION      = '1.24.0'
+        // ECR
+        IMAGE_NAME      = 'gogs'
+        ECR_NAMESPACE   = 'gogs'
+        ECR_REPO_NAME   = 'images'
+        ECR_URI         = "${env.ECR_URI}"
+        ECR_REGION      = "${env.ECR_REGION}"
+        CREDENTIALS_ID  = 'Jenkins_ECR'
         FULL_IMAGE_NAME = "${ECR_NAMESPACE}/${ECR_REPO_NAME}"
     }
     
@@ -39,7 +39,7 @@ pipeline {
         // stage('Git Clone') {
         //     steps {
         //         sh'go version'
-        //         git branch: 'main', credentialsId: 'gogs_jenkins_github_app', url: 'https://github.com/finkord/gogs'
+        //         git branch: 'feature-x', credentialsId: 'gogs_jenkins_github_app', url: 'https://github.com/finkord/gogs'
         //     }
         // }
 
@@ -48,8 +48,8 @@ pipeline {
                 sh"go mod tidy"
                 sh"go install golang.org/x/tools/cmd/goimports@latest"
                 sh"""
-                   export PATH=$PATH:\$(go env GOPATH)/bin
-                   CGO_ENABLED=1 go generate ./... 
+                  export PATH=$PATH:\$(go env GOPATH)/bin
+                  CGO_ENABLED=1 go generate ./... 
                 """
             }
         }
@@ -71,6 +71,49 @@ pipeline {
                 sh 'go test -cover -race -coverprofile=coverage.out -covermode=atomic ./...'
             }
         }
+
+        stage('SonarQube analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'SonarQubeScanner'
+                    withSonarQubeEnv('SonarQubeCommunity') {
+                        sh "${scannerHome}/bin/sonar-scanner"
+                    }
+                }
+            }
+        }  
+
+        stage("Quality Gate") {
+            steps {
+                timeout(time: 1, unit: 'HOURS') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        } 
+
+        stage("Snyk Security Test") {
+            steps {
+                script {
+                    try {
+                        snykSecurity(
+                            snykInstallation: 'snyk@latest',
+                            snykTokenId: 'snyk_api',
+                            additionalArguments: '--all-projects',
+                            // failOnIssues: false
+                        )
+                    } catch (err) {
+                        echo "Snyk failed: ${err}"
+                        discordSend(
+                            webhookURL: env.DISCORD_WEBHOOK,
+                            title: env.JOB_NAME,
+                            link: env.BUILD_URL,
+                            description: "Snyk Test Failed: build ${env.BUILD_NUMBER}",
+                            result: 'FAILURE'
+                        )
+                    }
+                }
+            }
+        }  
 
         stage('Prepare Variables') {
             steps {
