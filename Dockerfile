@@ -24,12 +24,6 @@ RUN ./docker/build/install-task.sh
 # Build Gogs
 RUN TAGS="cert pam" task build
 
-# Install OCB builder
-RUN go install go.opentelemetry.io/collector/cmd/builder@v0.128.0
-
-# Build OpenTelemetry Collector binary
-RUN builder --config=./docker/templates/builder-config.yaml
-
 # Build OpenTelemetry Go Instrumentation
 RUN git clone https://github.com/open-telemetry/opentelemetry-go-instrumentation.git /otel && \
   cd /otel && make build
@@ -54,7 +48,7 @@ RUN apk --no-cache --no-progress add \
 
 # Set environment
 ENV GOGS_CUSTOM=/data/gogs
-ENV PATH="/app/otelcol:${PATH}"
+# ENV PATH="/app/otelcol:${PATH}"
 
 # Configure LibC Name Service
 COPY docker/nsswitch.conf /etc/nsswitch.conf
@@ -65,7 +59,6 @@ WORKDIR /app/gogs
 # Copy runtime files
 COPY docker ./docker
 COPY --from=binarybuilder /gogs.io/gogs/gogs .
-COPY --from=binarybuilder /gogs.io/gogs/otelcol-gogs/otelcol-gogs /app/gogs/otelcol
 COPY --from=binarybuilder /otel/otel-go-instrumentation /app/otel-go-instrumentation
 
 RUN ./docker/build/finalize.sh
