@@ -59,31 +59,35 @@ pipeline {
             }
         }
 
-        stage('Test') {
-            steps {
-                sh 'go test -cover -race -coverprofile=coverage.out -covermode=atomic ./...'
-            }
-        }
-
-        stage("Snyk Security Test") {
-            steps {
-                script {
-                    try {
-                        snykSecurity(
-                            snykInstallation: 'snyk@latest',
-                            snykTokenId: 'snyk_api',
-                            additionalArguments: '--all-projects',
-                            // failOnIssues: false
-                        )
-                    } catch (err) {
-                        echo "Snyk failed: ${err}"
-                        discordSend(
-                            webhookURL: env.DISCORD_WEBHOOK,
-                            title: env.JOB_NAME,
-                            link: env.BUILD_URL,
-                            description: "Snyk Test Failed: build ${env.BUILD_NUMBER}",
-                            result: 'UNSTABLE'
-                        )
+        stage('Quality Checks') {
+            parallel {
+                stage('Coverage Test') {
+                    steps {
+                        sh 'go test -cover -race -coverprofile=coverage.out -covermode=atomic ./...'
+                    }
+                }
+                
+                stage('Snyk Security Test') {
+                    steps {
+                        script {
+                            try {
+                                snykSecurity(
+                                    snykInstallation: 'snyk@latest',
+                                    snykTokenId: 'snyk_api',
+                                    additionalArguments: '--all-projects',
+                                    // failOnIssues: false
+                                )
+                            } catch (err) {
+                                echo "Snyk failed: ${err}"
+                                discordSend(
+                                    webhookURL: env.DISCORD_WEBHOOK,
+                                    title: env.JOB_NAME,
+                                    link: env.BUILD_URL,
+                                    description: "Snyk Test Failed: build ${env.BUILD_NUMBER}",
+                                    result: 'UNSTABLE'
+                                )
+                            }
+                        }
                     }
                 }
             }
