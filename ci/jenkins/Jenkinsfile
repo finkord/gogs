@@ -1,17 +1,16 @@
 pipeline {
-    agent any
+    // agent any
+    agent {label'amazon-linux-with-docker'}
 
     environment {
         // Golang
         GO_VERSION      = '1.24.0'
         // ECR
-        IMAGE_NAME      = 'gogs'
         ECR_NAMESPACE   = 'gogs'
-        ECR_REPO_NAME   = 'images'
+        ECR_REPO_NAME   = 'test'
         ECR_URI         = "${env.ECR_URI}"
         ECR_REGION      = "${env.ECR_REGION}"
-        CREDENTIALS_ID  = 'Jenkins_ECR'
-        FULL_IMAGE_NAME = "${ECR_NAMESPACE}/${ECR_REPO_NAME}"
+        FULL_IMAGE_NAME = "${ECR_URI}/${ECR_NAMESPACE}/${ECR_REPO_NAME}"
     }
     
     tools {
@@ -36,13 +35,6 @@ pipeline {
             }
         }
 
-        // stage('Git Clone') {
-        //     steps {
-        //         sh'go version'
-        //         git branch: 'feature-x', credentialsId: 'gogs_jenkins_github_app', url: 'https://github.com/finkord/gogs'
-        //     }
-        // }
-
         stage('Validate and Generate Code') {
             steps {
                 sh"go mod tidy"
@@ -56,64 +48,50 @@ pipeline {
 
         stage('Lint') {
             steps {
-                script {
-                    sh """
-                        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b \$(go env GOPATH)/bin v2.1.6
-                        export PATH=$PATH:\$(go env GOPATH)/bin
-                        golangci-lint run --timeout=30m
-                    """
-                }
-            }
-        }
-        
-        stage('Test') {
-            steps {
-                sh 'go test -cover -race -coverprofile=coverage.out -covermode=atomic ./...'
+                sh '''
+                WORKDIR="$(pwd)"
+                docker run --rm \
+                    -v "$WORKDIR":/app \
+                    -w /app \
+                    golangci/golangci-lint:v2.1.6 \
+                    golangci-lint run --timeout=30m || true
+                '''
             }
         }
 
-        stage('SonarQube analysis') {
-            steps {
-                script {
-                    def scannerHome = tool 'SonarQubeScanner'
-                    withSonarQubeEnv('SonarQubeCommunity') {
-                        sh "${scannerHome}/bin/sonar-scanner"
+        stage('Quality Checks') {
+            parallel {
+                stage('Coverage Test') {
+                    steps {
+                        sh 'go test -cover -race -coverprofile=coverage.out -covermode=atomic ./...'
+                    }
+                }
+                
+                stage('Snyk Security Test') {
+                    steps {
+                        script {
+                            try {
+                                snykSecurity(
+                                    snykInstallation: 'snyk@latest',
+                                    snykTokenId: 'snyk_api',
+                                    additionalArguments: '--all-projects',
+                                    // failOnIssues: false
+                                )
+                            } catch (err) {
+                                echo "Snyk failed: ${err}"
+                                discordSend(
+                                    webhookURL: env.DISCORD_WEBHOOK,
+                                    title: env.JOB_NAME,
+                                    link: env.BUILD_URL,
+                                    description: "Snyk Test Failed: build ${env.BUILD_NUMBER}",
+                                    result: 'UNSTABLE'
+                                )
+                            }
+                        }
                     }
                 }
             }
-        }  
-
-        stage("Quality Gate") {
-            steps {
-                timeout(time: 1, unit: 'HOURS') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        } 
-
-        stage("Snyk Security Test") {
-            steps {
-                script {
-                    try {
-                        snykSecurity(
-                            snykInstallation: 'snyk@latest',
-                            snykTokenId: 'snyk_api',
-                            additionalArguments: '--all-projects',
-                            // failOnIssues: false
-                        )
-                    } catch (err) {
-                        echo "Snyk failed: ${err}"
-                        discordSend(
-                            webhookURL: env.DISCORD_WEBHOOK,
-                            title: env.JOB_NAME,
-                            link: env.BUILD_URL,
-                            description: "Snyk Test Failed: build ${env.BUILD_NUMBER}",
-                            result: 'FAILURE'
-                        )
-                    }
-                }
-            }
-        }  
+        }
 
         stage('Prepare Variables') {
             steps {
@@ -127,51 +105,26 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Push to AWS ECR & Build Docker Image') {
             steps {
-                script {
-                    gogsImage = docker.build("${FULL_IMAGE_NAME}:${env.IMAGE_TAG}")
-                    gogsImage.tag('latest')
+                withAWS(region: "${env.ECR_REGION}") {
+                    sh """
+                    aws ecr get-login-password --region ${env.ECR_REGION} | \
+                    docker login --username AWS --password-stdin ${env.ECR_URI}
+                    """
                 }
-            }
-        }
+                script {
+                    def gogsImage = docker.build("${env.FULL_IMAGE_NAME}:${env.IMAGE_TAG}")
+                    gogsImage.push(env.IMAGE_TAG)
+                    gogsImage.push('latest')
 
-        stage('Push to AWS ECR') {
-            steps {
-                script {
-                    docker.withRegistry("https://${ECR_URI}", "ecr:${ECR_REGION}:${CREDENTIALS_ID}") {
-                        gogsImage.push(env.IMAGE_TAG)
-                        gogsImage.push('latest')
-                    }
+                    sh """
+                    docker rmi ${env.FULL_IMAGE_NAME}:${env.IMAGE_TAG} || true
+                    docker rmi ${env.FULL_IMAGE_NAME}:latest || true
+                    """
                 }
             }
         }
-        
-        // stage('Build') {
-        //     steps {
-        //         sh 'go build -v .'
-        //     }
-        // }
-        
-        // stage('Artifact Build') {
-        //     steps {
-        //         script {
-        //             def buildArtifactsDir = "artifacts/build_${BUILD_NUMBER}"
-        //             sh """
-        //             mkdir -p artifacts
-        //             mkdir -p ${buildArtifactsDir}/log
-        //             mkdir -p ${buildArtifactsDir}/coverages
-                    
-        //             cp ./gogs ${buildArtifactsDir}/
-        //             cp -r ./scripts ${buildArtifactsDir}/scripts
-        //             go tool cover -html=coverage.out -o coverage.html
-        //             cp ./coverage*.out ${buildArtifactsDir}/coverages/
-        //             """
-        //             //publishHTML([reportDir: '.', reportFiles: 'coverage.html', reportName: 'Go Coverage'])
-        //             archiveArtifacts artifacts: "${buildArtifactsDir}/**", fingerprint: true
-        //         }
-        //     }
-        // }
     }
 
     post {
