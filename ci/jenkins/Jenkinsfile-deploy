@@ -1,0 +1,110 @@
+pipeline {
+    agent { 
+        label 'amazon-linux-with-docker' 
+    }
+
+    parameters {
+        string(
+            name: 'IMAGE_TAG', 
+            description: 'Tag of the image to promote to prod'
+        )
+    }
+
+    environment {
+        // Input parameters
+        IMAGE_TAG = "${params.IMAGE_TAG}"
+        
+        // ECR configuration
+        ECR_URI = "${env.ECR_URI}"
+        ECR_REGION = "${env.ECR_REGION}"
+        FULL_IMAGE_NAME = "${ECR_URI}/gogs/test"
+    }
+
+    stages {
+
+        stage('Notify Deploy Start') {
+            steps {
+                discordSend(
+                    webhookURL: env.DISCORD_WEBHOOK,
+                    title: env.JOB_NAME,
+                    link: env.BUILD_URL,
+                    description: "Deploy Started: build ${env.BUILD_NUMBER}",
+                    result: 'UNSTABLE'
+                )
+            }
+        }
+
+        stage('ECR Authentication') {
+            steps {
+                withAWS(region: "${env.ECR_REGION}") {
+                    sh """
+                        aws ecr get-login-password --region ${ECR_REGION} | \
+                        docker login --username AWS --password-stdin ${ECR_URI}
+                    """
+                }
+            }
+        }
+
+        stage('Promote Image to Production') {
+            steps {
+                script {
+                    def sourceImage = docker.image("${env.FULL_IMAGE_NAME}:${IMAGE_TAG}")
+                    echo "Pulling image: ${env.FULL_IMAGE_NAME}:${IMAGE_TAG}"
+                    sourceImage.pull()
+                    
+                    echo "Tagging and pushing as production image"
+                    sourceImage.push('prod')
+                }
+            }
+        }
+
+        stage('Deploy to ECS') {
+            steps {
+                withAWS(region: "${env.ECR_REGION}") {
+                    sh """
+                        echo "Updating ECS service: ${SERVICE_NAME} in cluster: ${CLUSTER_NAME}"
+                        aws ecs update-service \
+                            --cluster ${CLUSTER_NAME} \
+                            --service ${SERVICE_NAME} \
+                            --force-new-deployment
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            discordSend(
+                webhookURL: env.DISCORD_WEBHOOK,
+                title: env.JOB_NAME,
+                link: env.BUILD_URL,
+                description: "Deploy Success: build ${env.BUILD_NUMBER}",
+                result: 'SUCCESS',
+                showChangeset: true,
+            )
+        }
+        failure {
+            discordSend(
+                webhookURL: env.DISCORD_WEBHOOK,
+                title: env.JOB_NAME,
+                link: env.BUILD_URL,
+                description: "Deploy Failed: build ${env.BUILD_NUMBER}",
+                result: 'FAILURE',
+                showChangeset: true,
+            )
+        }
+        aborted {
+            discordSend(
+                webhookURL: env.DISCORD_WEBHOOK,
+                title: env.JOB_NAME,
+                link: env.BUILD_URL,
+                description: "Deploy Aborted: build ${env.BUILD_NUMBER}",
+                result: 'ABORTED',
+            )
+        }
+    }
+}
