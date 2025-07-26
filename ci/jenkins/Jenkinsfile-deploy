@@ -29,7 +29,7 @@ pipeline {
                     title: env.JOB_NAME,
                     link: env.BUILD_URL,
                     description: "Deploy Started: build ${env.BUILD_NUMBER}",
-                    result: 'UNSTABLE'
+                    result: 'ABORTED'
                 )
             }
         }

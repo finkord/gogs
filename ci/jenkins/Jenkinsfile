@@ -31,7 +31,7 @@ pipeline {
                     title: env.JOB_NAME,
                     link: env.BUILD_URL,
                     description: "Pipeline Started: build ${env.BUILD_NUMBER}",
-                    result: 'UNSTABLE',
+                    result: 'ABORTED',
                 )
             }
         }
@@ -71,7 +71,7 @@ pipeline {
                     -v "$WORKDIR":/app \
                     -w /app \
                     golangci/golangci-lint:v2.1.6 \
-                    golangci-lint run --timeout=30m
+                    golangci-lint run --timeout=30m 
                 '''
             }
         }
@@ -99,7 +99,7 @@ pipeline {
                             title: env.JOB_NAME,
                             link: env.BUILD_URL,
                             description: "Snyk Test Failed: build ${env.BUILD_NUMBER}",
-                            result: 'FAILURE'
+                            result: 'UNSTABLE'
                         )
                     }
                 }
