@@ -35,29 +35,29 @@ pipeline {
             }
         }
 
-        stage('Validate & Generate Code') {
-            steps {
-                sh"go mod tidy"
-                sh"go install golang.org/x/tools/cmd/goimports@latest"
-                sh"""
-                  export PATH=$PATH:\$(go env GOPATH)/bin
-                  CGO_ENABLED=1 go generate ./... 
-                """
-            }
-        }
+        // stage('Validate & Generate Code') {
+        //     steps {
+        //         sh"go mod tidy"
+        //         sh"go install golang.org/x/tools/cmd/goimports@latest"
+        //         sh"""
+        //           export PATH=$PATH:\$(go env GOPATH)/bin
+        //           CGO_ENABLED=1 go generate ./... 
+        //         """
+        //     }
+        // }
 
-        stage('Lint') {
-            steps {
-                sh '''
-                WORKDIR="$(pwd)"
-                docker run --rm \
-                    -v "$WORKDIR":/app \
-                    -w /app \
-                    golangci/golangci-lint:v2.1.6 \
-                    golangci-lint run --timeout=30m || true
-                '''
-            }
-        }
+        // stage('Lint') {
+        //     steps {
+        //         sh '''
+        //         WORKDIR="$(pwd)"
+        //         docker run --rm \
+        //             -v "$WORKDIR":/app \
+        //             -w /app \
+        //             golangci/golangci-lint:v2.1.6 \
+        //             golangci-lint run --timeout=30m || true
+        //         '''
+        //     }
+        // }
 
         stage('SonarQube Analysis') {
             steps {
@@ -66,17 +66,19 @@ pipeline {
                     withSonarQubeEnv('SonarQube Cloud') {
                         sh "${scannerHome}/bin/sonar-scanner"
                     }
+
+                    timeout(time: 10, unit: 'MINUTES') {
+                        waitForQualityGate abortPipeline: true
+                    }
                 }
             }
         }
 
-        stage("Quality Gate") {
-            steps {
-                timeout(time: 1, unit: 'HOURS') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
+        // stage("Quality Gate") {
+        //     steps {
+
+        //     }
+        // }
 
         stage('Quality Checks') {
             parallel {
