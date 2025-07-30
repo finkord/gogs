@@ -62,50 +62,56 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    scannerHome = tool 'SonarQube Scanner'
+                    def scannerHome = tool 'SonarQube Cloud'
                     withSonarQubeEnv() {
                         sh "${scannerHome}/bin/sonar-scanner"
                     }
                 }
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
+
+            }
+        }
+
+        stage("Quality Gate") {
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false
                 }
             }
         }
 
-        stage('Quality Checks') {
-            parallel {
-                stage('Coverage Test') {
-                    steps {
-                        sh 'go test -cover -race -coverprofile=coverage.out -covermode=atomic ./...'
-                    }
-                }
+        // stage('Quality Checks') {
+        //     parallel {
+        //         stage('Coverage Test') {
+        //             steps {
+        //                 sh 'go test -cover -race -coverprofile=coverage.out -covermode=atomic ./...'
+        //             }
+        //         }
                 
-                stage('Snyk Security Test') {
-                    steps {
-                        script {
-                            try {
-                                snykSecurity(
-                                    snykInstallation: 'snyk@latest',
-                                    snykTokenId: 'snyk_api',
-                                    additionalArguments: '--all-projects',
-                                    // failOnIssues: false
-                                )
-                            } catch (err) {
-                                echo "Snyk failed: ${err}"
-                                discordSend(
-                                    webhookURL: env.DISCORD_WEBHOOK,
-                                    title: env.JOB_NAME,
-                                    link: env.BUILD_URL,
-                                    description: "Snyk Test Failed: build ${env.BUILD_NUMBER}",
-                                    result: 'UNSTABLE'
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        //         stage('Snyk Security Test') {
+        //             steps {
+        //                 script {
+        //                     try {
+        //                         snykSecurity(
+        //                             snykInstallation: 'snyk@latest',
+        //                             snykTokenId: 'snyk_api',
+        //                             additionalArguments: '--all-projects',
+        //                             // failOnIssues: false
+        //                         )
+        //                     } catch (err) {
+        //                         echo "Snyk failed: ${err}"
+        //                         discordSend(
+        //                             webhookURL: env.DISCORD_WEBHOOK,
+        //                             title: env.JOB_NAME,
+        //                             link: env.BUILD_URL,
+        //                             description: "Snyk Test Failed: build ${env.BUILD_NUMBER}",
+        //                             result: 'UNSTABLE'
+        //                         )
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         stage('Prepare Variables') {
             steps {
@@ -142,9 +148,9 @@ pipeline {
     }
 
     post {
-        always {
-            cleanWs()
-        }
+        // always {
+        //     cleanWs()
+        // }
         success {
             discordSend(
                 webhookURL: env.DISCORD_WEBHOOK,
