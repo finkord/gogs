@@ -59,6 +59,17 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    scannerHome = tool 'SonarQube Scanner'
+                    withSonarQubeEnv('SonarQube Cloud') {
+                        sh "${scannerHome}/bin/sonar-scanner"
+                    }
+                }
+            }
+        }
+
         stage('Quality Checks') {
             parallel {
                 stage('Coverage Test') {
