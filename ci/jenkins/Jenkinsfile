@@ -31,12 +31,12 @@ pipeline {
             }
         }
 
-        stage('Git Clone') {
-            steps {
-                sh 'go version'
-                git branch: 'feature-x', credentialsId: 'gogs_jenkins_github_app', url: 'https://github.com/finkord/gogs'
-            }
-        }
+        // stage('Git Clone') {
+        //     steps {
+        //         sh 'go version'
+        //         git branch: 'feature-x', credentialsId: 'gogs_jenkins_github_app', url: 'https://github.com/finkord/gogs'
+        //     }
+        // }
 
         stage('Validate & Generate Code') {
             steps {
