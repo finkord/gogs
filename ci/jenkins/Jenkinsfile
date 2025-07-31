@@ -16,10 +16,6 @@ pipeline {
     tools {
         go "${GO_VERSION}" 
     }
-    
-    options {
-        buildDiscarder(logRotator(daysToKeepStr: '14', numToKeepStr: '20'))
-    }
 
     stages {
 
@@ -71,13 +67,13 @@ pipeline {
             }
         }
 
-        // stage("Quality Gate") {
-        //     steps {
-        //         timeout(time: 30, unit: 'MINUTES') {
-        //             waitForQualityGate abortPipeline: false
-        //         }
-        //     }
-        // }
+        stage("Quality Gate") {
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false
+                }
+            }
+        }
 
         // stage('Quality Checks') {
         //     parallel {
@@ -113,44 +109,44 @@ pipeline {
         //     }
         // }
 
-        stage('Prepare Variables') {
-            steps {
-                script {
-                    def branch    = env.GIT_BRANCH?.replaceAll(/^origin\//, '')?.replaceAll('/', '-') ?: 'unknown'
-                    def commit    = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                    def timestamp = sh(returnStdout: true, script: "date +%Y%m%d%H%M%S").trim()
-                    env.IMAGE_TAG = "${branch}-${commit}-${timestamp}"
-                    echo "Assigned IMAGE_TAG = ${env.IMAGE_TAG}"
-                }
-            }
-        }
+        // stage('Prepare Variables') {
+        //     steps {
+        //         script {
+        //             def branch    = env.GIT_BRANCH?.replaceAll(/^origin\//, '')?.replaceAll('/', '-') ?: 'unknown'
+        //             def commit    = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+        //             def timestamp = sh(returnStdout: true, script: "date +%Y%m%d%H%M%S").trim()
+        //             env.IMAGE_TAG = "${branch}-${commit}-${timestamp}"
+        //             echo "Assigned IMAGE_TAG = ${env.IMAGE_TAG}"
+        //         }
+        //     }
+        // }
 
-        stage('Build Docker Image & Push to AWS ECR') {
-            steps {
-                withAWS(region: "${env.ECR_REGION}") {
-                    sh """
-                    aws ecr get-login-password --region ${env.ECR_REGION} | \
-                    docker login --username AWS --password-stdin ${env.ECR_URI}
-                    """
-                }
-                script {
-                    def gogsImage = docker.build("${env.FULL_IMAGE_NAME}:${env.IMAGE_TAG}")
-                    gogsImage.push(env.IMAGE_TAG)
-                    gogsImage.push('latest')
+        // stage('Build Docker Image & Push to AWS ECR') {
+        //     steps {
+        //         withAWS(region: "${env.ECR_REGION}") {
+        //             sh """
+        //             aws ecr get-login-password --region ${env.ECR_REGION} | \
+        //             docker login --username AWS --password-stdin ${env.ECR_URI}
+        //             """
+        //         }
+        //         script {
+        //             def gogsImage = docker.build("${env.FULL_IMAGE_NAME}:${env.IMAGE_TAG}")
+        //             gogsImage.push(env.IMAGE_TAG)
+        //             gogsImage.push('latest')
 
-                    sh """
-                    docker rmi ${env.FULL_IMAGE_NAME}:${env.IMAGE_TAG} || true
-                    docker rmi ${env.FULL_IMAGE_NAME}:latest || true
-                    """
-                }
-            }
-        }
+        //             sh """
+        //             docker rmi ${env.FULL_IMAGE_NAME}:${env.IMAGE_TAG} || true
+        //             docker rmi ${env.FULL_IMAGE_NAME}:latest || true
+        //             """
+        //         }
+        //     }
+        // }
     }
 
     post {
-        // always {
-        //     cleanWs()
-        // }
+        always {
+            cleanWs()
+        }
         success {
             discordSend(
                 webhookURL: env.DISCORD_WEBHOOK,
