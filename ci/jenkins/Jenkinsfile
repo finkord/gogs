@@ -31,29 +31,36 @@ pipeline {
             }
         }
 
-        // stage('Validate & Generate Code') {
-        //     steps {
-        //         sh"go mod tidy"
-        //         sh"go install golang.org/x/tools/cmd/goimports@latest"
-        //         sh"""
-        //           export PATH=$PATH:\$(go env GOPATH)/bin
-        //           CGO_ENABLED=1 go generate ./... 
-        //         """
-        //     }
-        // }
+        stage('Git Clone') {
+            steps {
+                sh 'go version'
+                git branch: 'feature-x', credentialsId: 'gogs_jenkins_github_app', url: 'https://github.com/finkord/gogs'
+            }
+        }
 
-        // stage('Lint') {
-        //     steps {
-        //         sh '''
-        //         WORKDIR="$(pwd)"
-        //         docker run --rm \
-        //             -v "$WORKDIR":/app \
-        //             -w /app \
-        //             golangci/golangci-lint:v2.1.6 \
-        //             golangci-lint run --timeout=30m || true
-        //         '''
-        //     }
-        // }
+        stage('Validate & Generate Code') {
+            steps {
+                sh"go mod tidy"
+                sh"go install golang.org/x/tools/cmd/goimports@latest"
+                sh"""
+                  export PATH=$PATH:\$(go env GOPATH)/bin
+                  CGO_ENABLED=1 go generate ./... 
+                """
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                sh '''
+                WORKDIR="$(pwd)"
+                docker run --rm \
+                    -v "$WORKDIR":/app \
+                    -w /app \
+                    golangci/golangci-lint:v2.1.6 \
+                    golangci-lint run --timeout=30m || true
+                '''
+            }
+        }
 
         stage('SonarQube Analysis') {
             steps {
@@ -66,88 +73,100 @@ pipeline {
             }
         }
 
+        stage("Delay before Quality Gate") {
+            steps {
+                echo "Sleeping to allow SonarCloud to complete background task"
+                sleep time: 30, unit: 'SECONDS'
+            }
+        }
+
         stage("Quality Gate") {
             steps {
-                // timeout(time: 10, unit: 'MINUTES') {
-                //     waitForQualityGate abortPipeline: true
-                // }
-                timeout(time: 30, unit: 'MINUTES') {
-                    script {
-                        def qg = waitForQualityGate(waitForQualityGateWebhook: false)
-                        if (qg.status != 'OK') {
-                            error "Quality Gate failed: ${qg.status}"
-                        }
-                    }
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
 
-        // stage('Quality Checks') {
-        //     parallel {
-        //         stage('Coverage Test') {
-        //             steps {
-        //                 sh 'go test -cover -race -coverprofile=coverage.out -covermode=atomic ./...'
-        //             }
-        //         }
-                
-        //         stage('Snyk Security Test') {
-        //             steps {
-        //                 script {
-        //                     try {
-        //                         snykSecurity(
-        //                             snykInstallation: 'snyk@latest',
-        //                             snykTokenId: 'snyk_api',
-        //                             additionalArguments: '--all-projects',
-        //                             // failOnIssues: false
-        //                         )
-        //                     } catch (err) {
-        //                         echo "Snyk failed: ${err}"
-        //                         discordSend(
-        //                             webhookURL: env.DISCORD_WEBHOOK,
-        //                             title: env.JOB_NAME,
-        //                             link: env.BUILD_URL,
-        //                             description: "Snyk Test Failed: build ${env.BUILD_NUMBER}",
-        //                             result: 'UNSTABLE'
-        //                         )
-        //                     }
+        // stage("Quality Gate") {
+        //     steps {
+        //         timeout(time: 10, unit: 'MINUTES') {
+        //             script {
+        //                 def qg = waitForQualityGate(waitForQualityGateWebhook: false)
+        //                 if (qg.status != 'OK') {
+        //                     error "Quality Gate failed: ${qg.status}"
         //                 }
         //             }
         //         }
         //     }
         // }
 
-        // stage('Prepare Variables') {
-        //     steps {
-        //         script {
-        //             def branch    = env.GIT_BRANCH?.replaceAll(/^origin\//, '')?.replaceAll('/', '-') ?: 'unknown'
-        //             def commit    = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-        //             def timestamp = sh(returnStdout: true, script: "date +%Y%m%d%H%M%S").trim()
-        //             env.IMAGE_TAG = "${branch}-${commit}-${timestamp}"
-        //             echo "Assigned IMAGE_TAG = ${env.IMAGE_TAG}"
-        //         }
-        //     }
-        // }
+        stage('Quality Checks') {
+            parallel {
+                stage('Coverage Test') {
+                    steps {
+                        sh 'go test -cover -race -coverprofile=coverage.out -covermode=atomic ./...'
+                    }
+                }
+                
+                stage('Snyk Security Test') {
+                    steps {
+                        script {
+                            try {
+                                snykSecurity(
+                                    snykInstallation: 'snyk@latest',
+                                    snykTokenId: 'snyk_api',
+                                    additionalArguments: '--all-projects',
+                                    // failOnIssues: false
+                                )
+                            } catch (err) {
+                                echo "Snyk failed: ${err}"
+                                discordSend(
+                                    webhookURL: env.DISCORD_WEBHOOK,
+                                    title: env.JOB_NAME,
+                                    link: env.BUILD_URL,
+                                    description: "Snyk Test Failed: build ${env.BUILD_NUMBER}",
+                                    result: 'UNSTABLE'
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-        // stage('Build Docker Image & Push to AWS ECR') {
-        //     steps {
-        //         withAWS(region: "${env.ECR_REGION}") {
-        //             sh """
-        //             aws ecr get-login-password --region ${env.ECR_REGION} | \
-        //             docker login --username AWS --password-stdin ${env.ECR_URI}
-        //             """
-        //         }
-        //         script {
-        //             def gogsImage = docker.build("${env.FULL_IMAGE_NAME}:${env.IMAGE_TAG}")
-        //             gogsImage.push(env.IMAGE_TAG)
-        //             gogsImage.push('latest')
+        stage('Prepare Variables') {
+            steps {
+                script {
+                    def branch    = env.GIT_BRANCH?.replaceAll(/^origin\//, '')?.replaceAll('/', '-') ?: 'unknown'
+                    def commit    = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                    def timestamp = sh(returnStdout: true, script: "date +%Y%m%d%H%M%S").trim()
+                    env.IMAGE_TAG = "${branch}-${commit}-${timestamp}"
+                    echo "Assigned IMAGE_TAG = ${env.IMAGE_TAG}"
+                }
+            }
+        }
 
-        //             sh """
-        //             docker rmi ${env.FULL_IMAGE_NAME}:${env.IMAGE_TAG} || true
-        //             docker rmi ${env.FULL_IMAGE_NAME}:latest || true
-        //             """
-        //         }
-        //     }
-        // }
+        stage('Build Docker Image & Push to AWS ECR') {
+            steps {
+                withAWS(region: "${env.ECR_REGION}") {
+                    sh """
+                    aws ecr get-login-password --region ${env.ECR_REGION} | \
+                    docker login --username AWS --password-stdin ${env.ECR_URI}
+                    """
+                }
+                script {
+                    def gogsImage = docker.build("${env.FULL_IMAGE_NAME}:${env.IMAGE_TAG}")
+                    gogsImage.push(env.IMAGE_TAG)
+                    gogsImage.push('latest')
+
+                    sh """
+                    docker rmi ${env.FULL_IMAGE_NAME}:${env.IMAGE_TAG} || true
+                    docker rmi ${env.FULL_IMAGE_NAME}:latest || true
+                    """
+                }
+            }
+        }
     }
 
     post {
