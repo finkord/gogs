@@ -24,10 +24,6 @@ RUN ./docker/build/install-task.sh
 # Build Gogs
 RUN TAGS="cert pam" task build
 
-# Build OpenTelemetry Go Instrumentation
-# RUN git clone https://github.com/open-telemetry/opentelemetry-go-instrumentation.git /otel && \
-#   cd /otel && make build
-
 # Stage 2: Final runtime image
 FROM alpine:3.21
 
@@ -59,7 +55,6 @@ WORKDIR /app/gogs
 # Copy runtime files
 COPY docker ./docker
 COPY --from=binarybuilder /gogs.io/gogs/gogs .
-# COPY --from=binarybuilder /otel/otel-go-instrumentation /app/otel-go-instrumentation
 
 RUN ./docker/build/finalize.sh
 
