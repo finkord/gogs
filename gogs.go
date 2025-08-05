@@ -22,6 +22,7 @@ func init() {
 }
 
 func main() {
+
 	app := cli.NewApp()
 	app.Name = "Gogs"
 	app.Usage = "A painless self-hosted Git service"
