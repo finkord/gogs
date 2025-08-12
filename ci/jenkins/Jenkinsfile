@@ -16,10 +16,6 @@ pipeline {
     tools {
         go "${GO_VERSION}" 
     }
-    
-    options {
-        buildDiscarder(logRotator(daysToKeepStr: '14', numToKeepStr: '20'))
-    }
 
     stages {
 
@@ -34,6 +30,13 @@ pipeline {
                 )
             }
         }
+
+        // stage('Git Clone') {
+        //     steps {
+        //         sh 'go version'
+        //         git branch: 'feature-x', credentialsId: 'gogs_jenkins_github_app', url: 'https://github.com/finkord/gogs'
+        //     }
+        // }
 
         stage('Validate & Generate Code') {
             steps {
@@ -58,6 +61,45 @@ pipeline {
                 '''
             }
         }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'SonarQube Cloud'
+                    withSonarQubeEnv('SonarQube Cloud') {
+                        sh "${scannerHome}/bin/sonar-scanner"
+                    }
+                }
+            }
+        }
+
+        stage("Delay before Quality Gate") {
+            steps {
+                echo "Sleeping to allow SonarCloud to complete background task"
+                sleep time: 30, unit: 'SECONDS'
+            }
+        }
+
+        stage("Quality Gate") {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        // stage("Quality Gate") {
+        //     steps {
+        //         timeout(time: 10, unit: 'MINUTES') {
+        //             script {
+        //                 def qg = waitForQualityGate(waitForQualityGateWebhook: false)
+        //                 if (qg.status != 'OK') {
+        //                     error "Quality Gate failed: ${qg.status}"
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         stage('Quality Checks') {
             parallel {

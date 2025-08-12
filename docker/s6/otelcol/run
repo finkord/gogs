@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# exec /app/otelcol/otelcol-contrib --config /app/gogs/docker/templates/config.yaml
+exec gosu git /app/otelcol/splunk-otel-collector/bin/otelcol --config /app/gogs/docker/templates/splunk-otel-config.yaml
