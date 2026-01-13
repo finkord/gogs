@@ -30,7 +30,7 @@ RUN curl -fsSL -o /otelcol.tar.gz https://github.com/signalfx/splunk-otel-collec
   rm /otelcol.tar.gz
 
 # Stage 2: Final runtime image
-FROM alpine:3.21
+FROM alpine:3.23.2
 
 # Install runtime dependencies only
 RUN apk --no-cache --no-progress add \
