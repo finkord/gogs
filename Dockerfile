@@ -19,15 +19,16 @@ WORKDIR /gogs.io/gogs
 COPY . .
 
 # Install Task
+RUN chmod +x ./docker/build/install-task.sh
 RUN ./docker/build/install-task.sh
 
 # Build Gogs
 RUN TAGS="cert pam" task build
 
-RUN curl -fsSL -o /otelcol.tar.gz https://github.com/signalfx/splunk-otel-collector/releases/download/v0.130.0/splunk-otel-collector_0.130.0_amd64.tar.gz && \
-  mkdir -p /otelcol && \
-  tar -xzf /otelcol.tar.gz -C /otelcol && \
-  rm /otelcol.tar.gz
+# RUN curl -fsSL -o /otelcol.tar.gz https://github.com/signalfx/splunk-otel-collector/releases/download/v0.130.0/splunk-otel-collector_0.130.0_amd64.tar.gz && \
+#   mkdir -p /otelcol && \
+#   tar -xzf /otelcol.tar.gz -C /otelcol && \
+#   rm /otelcol.tar.gz
 
 # Stage 2: Final runtime image
 FROM alpine:3.21
@@ -49,7 +50,7 @@ RUN apk --no-cache --no-progress add \
 
 # Set environment
 ENV GOGS_CUSTOM=/data/gogs
-ENV PATH="/app/otelcol/splunk-otel-collector:${PATH}"
+# ENV PATH="/app/otelcol/splunk-otel-collector:${PATH}"
 
 # Configure LibC Name Service
 COPY docker/nsswitch.conf /etc/nsswitch.conf
@@ -60,8 +61,9 @@ WORKDIR /app/gogs
 # Copy runtime files
 COPY docker ./docker
 COPY --from=binarybuilder /gogs.io/gogs/gogs .
-COPY --from=binarybuilder /otelcol /app/otelcol
+# COPY --from=binarybuilder /otelcol /app/otelcol
 
+RUN chmod +x ./docker/build/finalize.sh
 RUN ./docker/build/finalize.sh
 
 # Volumes and ports
